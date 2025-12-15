@@ -105,7 +105,7 @@ jobs:
         uses: herondlabs/action-lark-notify@main
         with:
           columnsPerRow: 2
-          token: ${{ secrets.git_token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           cardItems: |
             **Repo**<br>[${{ github.repository }}](${{ github.server_url }}/${{ github.repository }})
             **Actor**<br>${{ github.actor }}
