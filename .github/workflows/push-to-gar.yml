@@ -1,0 +1,55 @@
+name: Build and Push to Google Registry
+run-name: >
+  Deployment to Env: ${{ inputs.environment }},
+  Level: ${{ inputs.update_level }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, uat, staging, prod]
+        description: "Select Environment"
+      update_level:
+        type: choice
+        options: [major, minor, patch]
+        default: patch 
+        description: "Bump Version Level"
+      claude-proxy:
+        type: boolean
+        default: true
+        description: "Deploy claude proxy?" 
+
+permissions:
+  contents: write 
+  actions: read
+
+jobs:
+  claude-proxy:
+    if: ${{ inputs.claude-proxy == true }}
+    uses: herondlabs/herond-common/.github/workflows/gar-build-push-v2.yml@develop
+    with:
+      environment: ${{ inputs.environment }}
+      update_level: ${{ inputs.update_level }}
+      service: api     
+      
+      image-name: claude-proxy
+      repository: ${{ vars.GCP_REPOSITORY_NAME }}
+      docker-file-path: ./Dockerfile
+      
+      prod_project_id: ${{ vars.GCP_PROJECT_ID_PROD }}
+      prod_region:     ${{ vars.GAR_REGION_PROD }}
+      stag_project_id: ${{ vars.GCP_PROJECT_ID_STAGING }}
+      stag_region:     ${{ vars.GAR_REGION_STAGING }}
+      dev_project_id:  ${{ vars.GCP_PROJECT_ID_DEV }}
+      dev_region:      ${{ vars.GAR_REGION_DEV }}
+      
+    secrets:
+      key_prod: ${{ secrets.GAR_JSON_KEY_PROD }}
+      key_stag: ${{ secrets.GAR_JSON_KEY_STAG }}
+      key_dev:  ${{ secrets.GAR_JSON_KEY_DEV }}
+      key_uat:  ${{ secrets.GAR_JSON_KEY_UAT }}
+      
+      git_token: ${{ secrets.GH_PACKAGES_TOKEN }}
+      lark_webhook: ${{ secrets.LARK_WEBHOOK }}
+      gh_packages_token: ${{ secrets.GH_PACKAGES_TOKEN }}
