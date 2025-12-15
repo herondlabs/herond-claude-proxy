@@ -1,55 +1,91 @@
-name: Build and Push to Google Registry
-run-name: >
-  Deployment to Env: ${{ inputs.environment }},
-  Level: ${{ inputs.update_level }}
-
-on:
+name: Manual Build & Push
+on: 
   workflow_dispatch:
-    inputs:
-      environment:
+    inputs: 
+      target_env:
+        description: 'Select the target environment'
+        required: true
+        default: 'dev'
         type: choice
-        options: [dev, uat, staging, prod]
-        description: "Select Environment"
+        options:
+          - dev
+          - staging
+          - production 
       update_level:
+        description: 'Bump version level'
+        required: true
+        default: 'patch'
         type: choice
-        options: [major, minor, patch]
-        default: patch 
-        description: "Bump Version Level"
-      claude-proxy:
-        type: boolean
-        default: true
-        description: "Deploy claude proxy?" 
-
-permissions:
-  contents: write 
-  actions: read
+        options:
+          - patch
+          - minor
+          - major 
+      service_name:
+        description: 'Service Name (for tagging)'
+        required: true
+        default: 'api'  
+        type: string
 
 jobs:
-  claude-proxy:
-    if: ${{ inputs.claude-proxy == true }}
-    uses: herondlabs/herond-common/.github/workflows/gar-build-push-v2.yml@develop
-    with:
-      environment: ${{ inputs.environment }}
-      update_level: ${{ inputs.update_level }}
-      service: api     
-      
-      image-name: claude-proxy
-      repository: ${{ vars.GCP_REPOSITORY_NAME }}
-      docker-file-path: ./Dockerfile
-      
-      prod_project_id: ${{ vars.GCP_PROJECT_ID_PROD }}
-      prod_region:     ${{ vars.GAR_REGION_PROD }}
-      stag_project_id: ${{ vars.GCP_PROJECT_ID_STAGING }}
-      stag_region:     ${{ vars.GAR_REGION_STAGING }}
-      dev_project_id:  ${{ vars.GCP_PROJECT_ID_DEV }}
-      dev_region:      ${{ vars.GAR_REGION_DEV }}
-      
-    secrets:
-      key_prod: ${{ secrets.GAR_JSON_KEY_PROD }}
-      key_stag: ${{ secrets.GAR_JSON_KEY_STAG }}
-      key_dev:  ${{ secrets.GAR_JSON_KEY_DEV }}
-      key_uat:  ${{ secrets.GAR_JSON_KEY_UAT }}
-      
-      git_token: ${{ secrets.GH_PACKAGES_TOKEN }}
-      lark_webhook: ${{ secrets.LARK_WEBHOOK }}
-      gh_packages_token: ${{ secrets.GH_PACKAGES_TOKEN }}
+  manual-publish:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_env }}
+
+    permissions:
+      contents: write 
+      id-token: write 
+
+    steps:
+      - uses: actions/checkout@v4
+       
+      - name: Bump Version Tag
+        id: bump_tag
+        uses: actions/github-script@v7
+        with:
+          script: | 
+            const bumpTag = require('${{ github.workspace }}/.github/scripts/bump-tag.js');
+             
+            const newTag = await bumpTag({
+              github,
+              context,
+              service: '${{ inputs.service_name }}',
+              env: '${{ inputs.target_env }}',
+              updateLevel: '${{ inputs.update_level }}',
+              format: 'service-env'  
+            });
+             
+            core.setOutput('new_tag', newTag);
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Google Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Collect image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPO }}/${{ vars.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest 
+            type=raw,value=${{ steps.bump_tag.outputs.new_tag }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
