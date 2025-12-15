@@ -45,7 +45,7 @@ jobs:
           script: | 
             const { bumpTag } = require('${{ github.workspace }}/.github/scripts/bump-tag.js');
              
-            const newTag = await bumpTag({
+            const { latestTag, newTag } = await bumpTag({
               github,
               context,
               service: '${{ inputs.service_name }}',
