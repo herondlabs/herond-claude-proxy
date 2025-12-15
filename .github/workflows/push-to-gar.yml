@@ -81,6 +81,7 @@ jobs:
             type=raw,value=${{ steps.bump_tag.outputs.new_tag }}
 
       - name: Build and push Docker image
+        id: docker_build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -89,3 +90,30 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Determine msg color
+        if: always()
+        run: |
+          if [[ "${{ steps.docker_build.outcome }}" == "success" ]]; then
+            echo "MSG_COLOR=green" >> $GITHUB_ENV
+          else
+            echo "MSG_COLOR=red" >> $GITHUB_ENV
+          fi
+          
+      - name: Notify Lark
+        if: always()
+        uses: herondlabs/action-lark-notify@main
+        with:
+          columnsPerRow: 2
+          token: ${{ secrets.git_token }}
+          cardItems: |
+            **Repo**<br>[${{ github.repository }}](${{ github.server_url }}/${{ github.repository }})
+            **Actor**<br>${{ github.actor }}
+            **Branch**<br>[${{ github.ref_name }}](${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }})            
+            **Env**<br>${{ inputs.target_env }} 
+            **Tag**<br>${{ steps.bump_tag.outputs.new_tag }} 
+            **Build Logs**<br>[{{GITHUB_RUN_ID}}]({{GITHUB_JOB_URL}})
+        env:
+          LARK_WEBHOOK: ${{ secrets.lark_webhook }}
+          LARK_MESSAGE_TEMPLATE: ${{ env.MSG_COLOR }}
+          LARK_MESSAGE_TITLE: "GAR Build ${{ github.repository }}: ${{ steps.bump_tag.outputs.new_tag }}"          
