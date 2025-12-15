@@ -43,7 +43,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: | 
-            const bumpTag = require('${{ github.workspace }}/.github/scripts/bump-tag.js');
+            const { bumpTag } = require('${{ github.workspace }}/.github/scripts/bump-tag.js');
              
             const newTag = await bumpTag({
               github,
@@ -51,7 +51,7 @@ jobs:
               service: '${{ inputs.service_name }}',
               env: '${{ inputs.target_env }}',
               updateLevel: '${{ inputs.update_level }}',
-              format: 'service-env'  
+              format: 'env-service'  
             });
              
             core.setOutput('new_tag', newTag);
