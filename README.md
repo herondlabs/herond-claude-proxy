@@ -97,7 +97,7 @@ docker run -d --env-file .env -p 8082:8082 ghcr.io/1rgs/claude-code-proxy:latest
 
 2. **Connect to your proxy**:
    ```bash
-   ANTHROPIC_BASE_URL=https://claude-proxy.dev.herond.org claude
+   ANTHROPIC_BASE_URL=http://localhost:8082 claude
    ```
 
 3. **That's it!** Your Claude Code client will now use the configured backend models (defaulting to OpenAI) through the proxy. 🎯
