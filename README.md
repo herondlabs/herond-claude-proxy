@@ -42,6 +42,9 @@ A proxy server that lets you use Anthropic clients with Gemini, OpenAI, or Anthr
    *   `ANTHROPIC_API_KEY`: (Optional) Needed only if proxying *to* Anthropic models.
    *   `OPENAI_API_KEY`: Your OpenAI API key (Required if using the default OpenAI preference or as fallback).
    *   `GEMINI_API_KEY`: Your Google AI Studio (Gemini) API key (Required if `PREFERRED_PROVIDER=google` and `USE_VERTEX_AUTH=true`).
+   *   `ANTHROPIC_API_KEYS`: (Optional) Set multiple Anthropic API keys (Needed only if proxying *to* Anthropic models).
+   *   `OPENAI_API_KEYS`: Set multiple OpenAI API keys (Required if using the default OpenAI preference or as fallback).
+   *   `GEMINI_API_KEYS`: Set multiple Google AI Studio (Gemini) API keys (Required if `PREFERRED_PROVIDER=google` and `USE_VERTEX_AUTH=true`).
    *   `USE_VERTEX_AUTH` (Optional): Set to `true` to use Application Default Credentials (ADC) will be used (no static API key required). Note: when USE_VERTEX_AUTH=true, you must configure `VERTEX_PROJECT` and `VERTEX_LOCATION`.
    *   `VERTEX_PROJECT` (Optional): Your Google Cloud Project ID (Required if `PREFERRED_PROVIDER=google` and `USE_VERTEX_AUTH=true`).
    *   `VERTEX_LOCATION` (Optional): The Google Cloud region for Vertex AI (e.g., `us-central1`) (Required if `PREFERRED_PROVIDER=google` and `USE_VERTEX_AUTH=true`).
@@ -103,10 +106,10 @@ docker run -d --env-file .env -p 8082:8082 ghcr.io/1rgs/claude-code-proxy:latest
 
 The proxy automatically maps Claude models to either OpenAI or Gemini models based on the configured model:
 
-| Claude Model | Default Mapping | When BIG_MODEL/SMALL_MODEL is a Gemini model |
-|--------------|--------------|---------------------------|
-| haiku | openai/gpt-4o-mini | gemini/[model-name] |
-| sonnet | openai/gpt-4o | gemini/[model-name] |
+| Claude Model | Default Mapping    | When BIG_MODEL/SMALL_MODEL is a Gemini model |
+| ------------ | ------------------ | -------------------------------------------- |
+| haiku        | openai/gpt-4o-mini | gemini/[model-name]                          |
+| sonnet       | openai/gpt-4o      | gemini/[model-name]                          |
 
 ### Supported Models
 
