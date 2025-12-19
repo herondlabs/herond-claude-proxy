@@ -21,13 +21,11 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Change to INFO level to show more details
+    level=logging.DEBUG,  # Change to DEBUG level to show more details
     format='%(asctime)s - %(levelname)s - %(message)s',
 )
 logger = logging.getLogger(__name__)
 
-# Configure uvicorn to be quieter
-import uvicorn
 # Tell uvicorn's loggers to be quiet
 logging.getLogger("uvicorn").setLevel(logging.WARNING)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
@@ -194,6 +192,7 @@ class Tool(BaseModel):
 
 class ThinkingConfig(BaseModel):
     enabled: bool = True
+    budget_token: int = 1024
 
 class MessagesRequest(BaseModel):
     model: str
@@ -577,7 +576,14 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
 
     # Only include thinking field for Anthropic models
     if anthropic_request.thinking and anthropic_request.model.startswith("anthropic/"):
-        litellm_request["thinking"] = anthropic_request.thinking
+        thinking_cfg = anthropic_request.thinking
+        if not thinking_cfg or not thinking_cfg.enabled:
+            litellm_request["thinking"] = {"type": "disabled"}
+        else:
+            litellm_request["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": thinking_cfg.budget_token,
+            }
 
     # Add optional parameters if present
     if anthropic_request.stop_sequences:
@@ -1551,6 +1557,10 @@ async def count_tokens(
         error_traceback = traceback.format_exc()
         logger.error(f"Error counting tokens: {str(e)}\n{error_traceback}")
         raise HTTPException(status_code=500, detail=f"Error counting tokens: {str(e)}")
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now()}
 
 @app.get("/")
 async def root():
