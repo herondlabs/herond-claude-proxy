@@ -8,6 +8,7 @@ import time
 import traceback
 import uuid
 from datetime import datetime
+from threading import Lock
 
 # Third-party imports
 from dotenv import load_dotenv
@@ -81,6 +82,7 @@ for handler in logger.handlers:
         handler.setFormatter(ColorizedFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 app = FastAPI()
+_api_key_lock = Lock()
 
 # Get API keys from environment
 WHITE_SPACES_AND_COMMA = re.compile(r'[\s,]+')
@@ -1236,34 +1238,41 @@ def sanitize_for_json(obj):
             return str(obj)
 
 # Helper function to switch LLM API key
-def switch_llm_api_key(model_name: str):
+def switch_llm_api_key(model_name: str) -> None:
     """Switch and set a new LLM API key from the API key list for the given model."""
 
     global ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY
 
-    # Map model name to key list and global variable name
-    key_map = {
-        "anthropic": ("ANTHROPIC_API_KEYS", "ANTHROPIC_API_KEY"),
-        "gemini": ("GEMINI_API_KEYS", "GEMINI_API_KEY"),
-        "openai": ("OPENAI_API_KEYS", "OPENAI_API_KEY")
-    }
+    with _api_key_lock:
+        if model_name == "openai":
+            if not OPENAI_API_KEYS:
+                raise RuntimeError("No OpenAI API keys configured")
 
-    if model_name not in key_map:
-        raise RuntimeError(f"Failed to switch API key: unsupported model '{model_name}'")
+            logger.debug("%s", f"Total OpenAI API keys found: {len(OPENAI_API_KEYS)}")
+            OPENAI_API_KEYS.append(OPENAI_API_KEYS.pop(0))
+            OPENAI_API_KEY = OPENAI_API_KEYS[0]
 
-    list_name, global_name = key_map[model_name]
-    key_list = globals()[list_name]
+        elif model_name == "anthropic":
+            if not ANTHROPIC_API_KEYS:
+                raise RuntimeError("No Anthropic API keys configured")
 
-    if len(key_list) <= 1:
-        raise RuntimeError(f"Failed to switch API key: out of {model_name.capitalize()} API keys")
+            logger.debug("%s", f"Total Anthropic API keys found: {len(ANTHROPIC_API_KEYS)}")
+            ANTHROPIC_API_KEYS.append(ANTHROPIC_API_KEYS.pop(0))
+            ANTHROPIC_API_KEY = ANTHROPIC_API_KEYS[0]
 
-    # Rotate the list: move the first key to the end
-    key_list.append(key_list.pop(0))
+        elif model_name == "gemini":
+            if not GEMINI_API_KEYS:
+                raise RuntimeError("No Gemini API keys configured")
 
-    # Set the global variable to the new current key
-    globals()[global_name] = key_list[0]
+            logger.debug("%s", f"Total Gemini API keys found: {len(GEMINI_API_KEYS)}")
+            GEMINI_API_KEYS.append(GEMINI_API_KEYS.pop(0))
+            GEMINI_API_KEY = GEMINI_API_KEYS[0]
 
-    logger.debug("%s", f"Switched {model_name} API key. Remaining keys: {len(key_list)}")
+        else:
+            raise RuntimeError(f"Unsupported model '{model_name}'")
+
+    logger.debug("Switched %s API key", model_name)
+
 
 @app.post("/v1/messages")
 async def create_message(
